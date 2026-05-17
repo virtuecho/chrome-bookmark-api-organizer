@@ -5,6 +5,7 @@
   "description": "Reference extension for reorganizing selected Chrome bookmark folders through the Chrome bookmarks API.",
   "permissions": [
     "bookmarks",
+    "downloads",
     "tabs",
     "storage"
   ],

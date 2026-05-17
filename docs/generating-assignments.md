@@ -9,12 +9,13 @@ It does not contain full bookmark data. It contains instructions saying where ea
 This path requires only Chrome:
 
 1. Load this repository as an unpacked extension.
-2. Enter target folder names, one per line.
-3. Click `Generate Template`.
-4. Copy or download the generated `assignments.js`.
-5. Replace `99 Unclassified / Needs Review` with real categories.
-6. Reload the extension.
-7. Run `Dry Run`.
+2. Open the advanced template section.
+3. Enter target folder names, one per line.
+4. Click `Generate Unclassified Template`.
+5. Copy or download the generated `assignments.js`.
+6. Replace `99 Unclassified / Needs Review` with real categories.
+7. Reload the extension.
+8. Run `Dry Run`.
 
 This works on macOS, Linux, and Windows because Chrome provides the live bookmark tree.
 

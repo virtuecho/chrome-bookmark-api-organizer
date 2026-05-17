@@ -80,21 +80,21 @@ Do not modify Chrome's Bookmarks file.
 Validate that every URL bookmark under each target folder appears exactly once.
 ```
 
-If Codex cannot read the local `Bookmarks` file directly, load the extension and use `Generate Template`, then give the generated template to Codex.
+If Codex cannot read the local `Bookmarks` file directly, load the extension and use the advanced `Generate Unclassified Template` tool, then give the generated template to Codex.
 
 After Codex finishes:
 
-1. Back up or export Chrome bookmarks.
-2. Open `chrome://extensions`.
-3. Enable `Developer mode`.
-4. Click `Load unpacked`.
-5. Select the cloned repository folder.
-6. Click `Dry Run` on the extension page.
-7. Click `Run Organizer` only if Dry Run reports an exact match.
+1. Open `chrome://extensions`.
+2. Enable `Developer mode`.
+3. Click `Load unpacked`.
+4. Select the cloned repository folder.
+5. Click `Dry Run` on the extension page.
+6. Click `Run Organizer` only if Dry Run reports an exact match.
+7. Save the required JSON backup when Chrome opens the save dialog.
 8. Keep Chrome open for a few minutes so Chrome Sync can upload the changes.
 9. Check another synced device before deleting backups.
 
-The extension page also has an optional temporary backup link area. It is for local convenience only; do not commit user-specific backup paths.
+`Run Organizer` refuses to write until the backup download finishes.
 
 ## Codex Steps
 

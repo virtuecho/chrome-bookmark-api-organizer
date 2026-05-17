@@ -59,30 +59,27 @@ The extension can generate an unclassified `assignments.js` template from the li
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
 4. Select this repository folder.
-5. Enter target folder names, one per line.
-6. Click `Generate Template`.
-7. Copy or download the generated template.
-8. Let Codex or a human replace `99 Unclassified / Needs Review` with real categories.
+5. Open the advanced template section.
+6. Enter target folder names, one per line.
+7. Click `Generate Unclassified Template`.
+8. Copy or download the generated template.
+9. Let Codex or a human replace `99 Unclassified / Needs Review` with real categories.
 
 This works on macOS, Linux, and Windows because it uses Chrome's own bookmark API, not OS-specific filesystem paths.
 
 ## Run The Organizer
 
-1. Back up or export bookmarks in Chrome.
-2. Make sure `assignments.js` exists in this repository folder.
-3. Load or reload this folder as an unpacked extension.
-4. Click `Dry Run`.
-5. Click `Run Organizer` only if Dry Run reports an exact match.
+1. Make sure `assignments.js` exists in this repository folder.
+2. Load or reload this folder as an unpacked extension.
+3. Click `Dry Run`.
+4. Click `Run Organizer` only if Dry Run reports an exact match.
+5. Save the required JSON backup when Chrome opens the save dialog.
 6. Keep Chrome open for a few minutes so Chrome Sync can upload the changes.
-7. Confirm the result on another synced device.
+7. Confirm the result on another synced device before deleting the backup.
 
 If you edit `assignments.js`, reload the unpacked extension before running again.
 
-## Temporary Backup Links
-
-The extension page has an optional temporary backup link area. Paste local references into the page, render them, and clear them when finished.
-
-These references are not saved by the extension and should not be committed to the repository.
+`Run Organizer` refuses to write until the backup download finishes.
 
 ## assignments.js Format
 

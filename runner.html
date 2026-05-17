@@ -60,6 +60,17 @@
         opacity: 0.55;
       }
 
+      details {
+        border-top: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+        margin-top: 18px;
+        padding-top: 14px;
+      }
+
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+
       #state {
         display: inline-block;
         margin-left: 8px;
@@ -99,37 +110,29 @@
       #assignment-output {
         min-height: 220px;
       }
-
-      #backup-links {
-        line-height: 1.7;
-        margin: 8px 0 20px;
-        padding-left: 22px;
-      }
     </style>
   </head>
   <body>
     <h1>Chrome Bookmark API Organizer</h1>
-    <p>Reorganize selected bookmark folders through Chrome's own bookmarks API. Back up bookmarks first, and make sure assignments.js was generated from the current Chrome profile.</p>
-    <label for="target-folders">Target folders, one per line</label>
-    <textarea id="target-folders" spellcheck="false" placeholder="Folder A&#10;Folder B"></textarea>
+    <p>Reorganize bookmark folders through Chrome's own bookmarks API. Run Organizer always asks you to save a JSON backup of the current live bookmark tree before it writes anything.</p>
     <div class="toolbar">
-      <button id="generate-template">Generate Template</button>
-      <button id="copy-template">Copy Template</button>
-      <button id="download-template">Download Template</button>
       <button id="dry-run">Dry Run</button>
       <button id="run">Run Organizer</button>
       <span id="state">Idle</span>
     </div>
-    <label for="assignment-output">Generated assignments.js template</label>
-    <textarea id="assignment-output" spellcheck="false"></textarea>
-    <label for="backup-input">Temporary backup links</label>
-    <p class="hint">Paste one per line as label and local reference separated by a vertical bar. These links are rendered only in this page and are not saved.</p>
-    <textarea id="backup-input" spellcheck="false" placeholder="Backup A | file-url-or-local-path"></textarea>
-    <div class="toolbar">
-      <button id="render-backups">Render Backup Links</button>
-      <button id="clear-backups">Clear Backup Links</button>
-    </div>
-    <ul id="backup-links"></ul>
+    <details>
+      <summary>Advanced: generate an unclassified assignments.js template</summary>
+      <p class="hint">Use this only when you need a fresh private assignments.js file from the live Chrome bookmark tree.</p>
+      <label for="target-folders">Target folders, one per line</label>
+      <textarea id="target-folders" spellcheck="false" placeholder="Folder A&#10;Folder B"></textarea>
+      <div class="toolbar">
+        <button id="generate-template">Generate Unclassified Template</button>
+        <button id="copy-template">Copy Template</button>
+        <button id="download-template">Download assignments.js</button>
+      </div>
+      <label for="assignment-output">Generated assignments.js template</label>
+      <textarea id="assignment-output" spellcheck="false"></textarea>
+    </details>
     <pre id="log"></pre>
     <script src="assignments.js"></script>
     <script src="runner.js"></script>

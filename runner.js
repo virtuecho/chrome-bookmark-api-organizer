@@ -4,13 +4,9 @@ const logEl = document.getElementById("log");
 const stateEl = document.getElementById("state");
 const targetFoldersEl = document.getElementById("target-folders");
 const assignmentOutputEl = document.getElementById("assignment-output");
-const backupInputEl = document.getElementById("backup-input");
-const backupLinksEl = document.getElementById("backup-links");
 const generateTemplateButton = document.getElementById("generate-template");
 const copyTemplateButton = document.getElementById("copy-template");
 const downloadTemplateButton = document.getElementById("download-template");
-const renderBackupsButton = document.getElementById("render-backups");
-const clearBackupsButton = document.getElementById("clear-backups");
 const dryRunButton = document.getElementById("dry-run");
 const runButton = document.getElementById("run");
 
@@ -36,11 +32,58 @@ function chromeCall(method, ...args) {
   });
 }
 
+function downloadWithSaveDialog(details) {
+  return new Promise((resolve, reject) => {
+    if (!chrome.downloads || !chrome.downloads.download) {
+      reject(new Error("Missing downloads permission. Reload the unpacked extension after updating manifest.json."));
+      return;
+    }
+
+    chrome.downloads.download(details, (downloadId) => {
+      const err = chrome.runtime.lastError;
+      if (err) reject(new Error(err.message));
+      else if (typeof downloadId !== "number") reject(new Error("Backup download was cancelled."));
+      else resolve(downloadId);
+    });
+  });
+}
+
+function waitForDownloadComplete(downloadId) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      chrome.downloads.onChanged.removeListener(listener);
+      reject(new Error("Timed out waiting for backup download to finish."));
+    }, 120000);
+
+    function finish(error) {
+      clearTimeout(timeout);
+      chrome.downloads.onChanged.removeListener(listener);
+      if (error) reject(error);
+      else resolve();
+    }
+
+    function listener(delta) {
+      if (delta.id !== downloadId || !delta.state) return;
+      if (delta.state.current === "complete") finish();
+      if (delta.state.current === "interrupted") finish(new Error("Backup download was interrupted."));
+    }
+
+    chrome.downloads.onChanged.addListener(listener);
+    chrome.downloads.search({ id: downloadId }, (items) => {
+      const err = chrome.runtime.lastError;
+      if (err) finish(new Error(err.message));
+      else if (items[0] && items[0].state === "complete") finish();
+      else if (items[0] && items[0].state === "interrupted") finish(new Error("Backup download was interrupted."));
+    });
+  });
+}
+
 const api = {
   getTree: () => chromeCall("getTree"),
   create: (details) => chromeCall("create", details),
   move: (id, details) => chromeCall("move", id, details),
   removeTree: (id) => chromeCall("removeTree", id),
+  download: (details) => downloadWithSaveDialog(details),
   storageSet: (value) => new Promise((resolve, reject) => {
     chrome.storage.local.set(value, () => {
       const err = chrome.runtime.lastError;
@@ -116,6 +159,24 @@ function findTargetFolder(tree, title) {
   return (bookmarkBar.children || []).find((node) => !node.url && node.title === title);
 }
 
+function collectBookmarkBarUrlItems(tree) {
+  const bookmarkBar = findBookmarkBar(tree);
+  if (!bookmarkBar) throw new Error("Cannot find the Bookmarks Bar.");
+  return (bookmarkBar.children || [])
+    .filter((node) => node.url)
+    .map((node) => ({
+      id: node.id,
+      title: node.title || "",
+      url: node.url || "",
+      path: bookmarkBar.title || "Bookmarks Bar"
+    }));
+}
+
+function collectIncomingBookmarkBarItems(tree, assignment) {
+  const assigned = assignment.byId || {};
+  return collectBookmarkBarUrlItems(tree).filter((item) => assigned[item.id]);
+}
+
 function collectUrlItems(folder) {
   const items = [];
   walk(folder, (node, trail) => {
@@ -156,24 +217,28 @@ function bucketItems(items, assignment) {
 
 function analyzeTarget(tree, targetName, assignment) {
   const target = findTargetFolder(tree, targetName);
-  if (!target) throw new Error(`Cannot find target folder: ${targetName}.`);
+  const incomingRootItems = collectIncomingBookmarkBarItems(tree, assignment);
+  if (!target && !incomingRootItems.length) throw new Error(`Cannot find target folder: ${targetName}.`);
 
-  const items = collectUrlItems(target);
+  const targetItems = target ? collectUrlItems(target) : [];
+  const items = [...targetItems, ...incomingRootItems];
   const liveIds = new Set(items.map((item) => item.id));
   const assignedIds = Object.keys(assignment.byId || {});
   const missingLiveIds = assignedIds.filter((id) => !liveIds.has(id));
-  const extraLiveIds = [...liveIds].filter((id) => !assignment.byId[id]);
+  const extraLiveIds = targetItems.map((item) => item.id).filter((id) => !assignment.byId[id]);
 
   return {
     targetName,
-    folderId: target.id,
+    folderId: target ? target.id : null,
+    targetExists: Boolean(target),
+    incomingBookmarkBarCount: incomingRootItems.length,
     bookmarkCount: items.length,
     assignedCount: assignedIds.length,
     missingLiveCount: missingLiveIds.length,
     extraLiveCount: extraLiveIds.length,
     missingLiveIds: missingLiveIds.slice(0, 20),
     extraLiveIds: extraLiveIds.slice(0, 20),
-    topChildren: (target.children || []).slice(0, 20).map((child) => ({
+    topChildren: ((target && target.children) || []).slice(0, 20).map((child) => ({
       id: child.id,
       title: child.title,
       url: Boolean(child.url)
@@ -268,72 +333,6 @@ function handleDownloadTemplate() {
   setState("Template Downloaded", "ok");
 }
 
-function encodePathPart(value) {
-  return value.split("/").map((part) => encodeURIComponent(part)).join("/");
-}
-
-function backupTargetToHref(target) {
-  const value = target.trim();
-  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return value;
-
-  if (/^[a-z]:[\\/]/i.test(value)) {
-    const normalized = value.replaceAll("\\", "/");
-    const drive = normalized.slice(0, 2);
-    const rest = normalized.slice(2);
-    return `file:///${drive}${encodePathPart(rest)}`;
-  }
-
-  if (value.startsWith("\\\\")) {
-    const normalized = value.replaceAll("\\", "/");
-    const withoutPrefix = normalized.replace(/^\/+/, "");
-    return `file://${encodePathPart(withoutPrefix)}`;
-  }
-
-  if (value.startsWith("/")) return `file://${encodePathPart(value)}`;
-  return value;
-}
-
-function parseBackupLine(line, index) {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
-  const separator = trimmed.indexOf("|");
-  const label = separator === -1 ? `Backup ${index + 1}` : trimmed.slice(0, separator).trim();
-  const target = separator === -1 ? trimmed : trimmed.slice(separator + 1).trim();
-  if (!target) return null;
-  return {
-    href: backupTargetToHref(target),
-    label: label || `Backup ${index + 1}`
-  };
-}
-
-function handleRenderBackups() {
-  backupLinksEl.textContent = "";
-  const links = backupInputEl.value
-    .split(/\r?\n/)
-    .map(parseBackupLine)
-    .filter(Boolean);
-
-  for (const link of links) {
-    const item = document.createElement("li");
-    const anchor = document.createElement("a");
-    anchor.href = link.href;
-    anchor.textContent = link.label;
-    anchor.target = "_blank";
-    anchor.rel = "noreferrer";
-    item.append(anchor);
-    backupLinksEl.append(item);
-  }
-
-  log({ backupLinksRendered: links.length });
-  setState(links.length ? "Backup Links Ready" : "No Backup Links", links.length ? "ok" : "");
-}
-
-function handleClearBackups() {
-  backupInputEl.value = "";
-  backupLinksEl.textContent = "";
-  setState("Backup Links Cleared");
-}
-
 async function removeOldFolders(oldChildren) {
   let removed = 0;
   for (const child of oldChildren) {
@@ -348,25 +347,84 @@ async function removeOldFolders(oldChildren) {
   return removed;
 }
 
-async function dryRun() {
+async function dryRun(tree = null) {
   const assignments = getAssignments();
   const targetNames = getTargetNames(assignments);
-  const tree = await api.getTree();
-  const results = targetNames.map((targetName) => analyzeTarget(tree, targetName, assignments[targetName]));
+  const bookmarkTree = tree || await api.getTree();
+  const results = targetNames.map((targetName) => analyzeTarget(bookmarkTree, targetName, assignments[targetName]));
+  const assignedIds = new Set();
+  for (const targetName of targetNames) {
+    for (const id of Object.keys((assignments[targetName] && assignments[targetName].byId) || {})) {
+      assignedIds.add(id);
+    }
+  }
+  const includeRootUrls = Boolean(globalThis.CODEX_BOOKMARK_INCLUDE_BOOKMARK_BAR_URLS);
+  const unassignedBookmarkBarIds = includeRootUrls
+    ? collectBookmarkBarUrlItems(bookmarkTree)
+      .map((item) => item.id)
+      .filter((id) => !assignedIds.has(id))
+    : [];
   const mismatch = results.filter((item) => item.bookmarkCount !== item.assignedCount || item.missingLiveCount || item.extraLiveCount);
   return {
-    ok: mismatch.length === 0,
+    ok: mismatch.length === 0 && unassignedBookmarkBarIds.length === 0,
     results,
-    mismatch
+    mismatch,
+    unassignedBookmarkBarIds: unassignedBookmarkBarIds.slice(0, 20),
+    unassignedBookmarkBarCount: unassignedBookmarkBarIds.length
   };
 }
 
+function timestampForFilename(date = new Date()) {
+  return date.toISOString().replace(/[:.]/g, "-");
+}
+
+async function saveBookmarkBackup(tree, preflight) {
+  const generatedAt = new Date();
+  const filename = `chrome-bookmarks-backup-${timestampForFilename(generatedAt)}.json`;
+  const backup = {
+    format: "chrome-bookmark-api-organizer-backup",
+    generatedAt: generatedAt.toISOString(),
+    source: "chrome.bookmarks.getTree()",
+    note: "Save this file before running the organizer. It contains the full live bookmark tree before any organizer writes.",
+    preflight,
+    tree
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  try {
+    const downloadId = await api.download({
+      url,
+      filename,
+      saveAs: true,
+      conflictAction: "uniquify"
+    });
+    await waitForDownloadComplete(downloadId);
+    const result = {
+      generatedAt: backup.generatedAt,
+      filename,
+      downloadId,
+      bookmarkCount: preflight.results.reduce((sum, item) => sum + item.bookmarkCount, 0)
+    };
+    await api.storageSet({ bookmarkOrganizerLastBackup: result });
+    return result;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function organizeTarget(tree, targetName, assignment, progress) {
-  const target = findTargetFolder(tree, targetName);
-  if (!target) throw new Error(`Cannot find target folder: ${targetName}.`);
+  const bookmarkBar = findBookmarkBar(tree);
+  if (!bookmarkBar) throw new Error("Cannot find the Bookmarks Bar.");
+  const incomingRootItems = collectIncomingBookmarkBarItems(tree, assignment);
+  let target = findTargetFolder(tree, targetName);
+  if (!target) {
+    if (!incomingRootItems.length) throw new Error(`Cannot find target folder: ${targetName}.`);
+    target = await api.create({ parentId: bookmarkBar.id, title: targetName });
+  }
 
   const oldChildren = [...(target.children || [])];
-  const items = collectUrlItems(target);
+  const items = [...collectUrlItems(target), ...incomingRootItems];
   const buckets = bucketItems(items, assignment);
   const counts = [];
   let createdFolders = 0;
@@ -451,13 +509,18 @@ async function runOrganizer() {
   try {
     const assignments = getAssignments();
     const targetNames = getTargetNames(assignments);
-    const preflight = await dryRun();
+    const tree = await api.getTree();
+    const preflight = await dryRun(tree);
     log({ preflight });
     if (!preflight.ok) {
       throw new Error("Preflight mismatch. Refusing to write because live bookmark IDs do not match assignments.js.");
     }
 
-    const tree = await api.getTree();
+    setState("Backup Required");
+    log("Choose a location to save the bookmark backup. The organizer will start only after the backup download finishes.");
+    const backup = await saveBookmarkBackup(tree, preflight);
+    log({ backupSaved: backup });
+
     const reports = [];
     const progress = { totalMoved: 0 };
     for (const targetName of targetNames) {
@@ -493,8 +556,6 @@ async function runOrganizer() {
 generateTemplateButton.addEventListener("click", handleGenerateTemplate);
 copyTemplateButton.addEventListener("click", handleCopyTemplate);
 downloadTemplateButton.addEventListener("click", handleDownloadTemplate);
-renderBackupsButton.addEventListener("click", handleRenderBackups);
-clearBackupsButton.addEventListener("click", handleClearBackups);
 dryRunButton.addEventListener("click", handleDryRun);
 runButton.addEventListener("click", runOrganizer);
 

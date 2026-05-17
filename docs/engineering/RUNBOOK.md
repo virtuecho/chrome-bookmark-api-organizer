@@ -6,20 +6,21 @@
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
 4. Select this repository folder.
-5. Enter target folder names, one per line.
-6. Click `Generate Template`.
-7. Copy or download the generated `assignments.js` template.
-8. Replace `99 Unclassified / Needs Review` with real categories.
+5. Open the advanced template section.
+6. Enter target folder names, one per line.
+7. Click `Generate Unclassified Template`.
+8. Copy or download the generated `assignments.js` template.
+9. Replace `99 Unclassified / Needs Review` with real categories.
 
 ## Run The Organizer
 
-1. Back up or export Chrome bookmarks.
-2. Make sure `assignments.js` exists in this repository folder.
-3. Reload the unpacked extension.
-4. Click `Dry Run`.
-5. Click `Run Organizer` only after Dry Run passes.
+1. Make sure `assignments.js` exists in this repository folder.
+2. Reload the unpacked extension.
+3. Click `Dry Run`.
+4. Click `Run Organizer` only after Dry Run passes.
+5. Save the required JSON backup when Chrome opens the save dialog.
 6. Keep Chrome open for Sync.
-7. Check another synced device.
+7. Check another synced device before deleting the backup.
 
 ## If Dry Run Fails
 
