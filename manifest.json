@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome Bookmark API Organizer",
+  "version": "0.1.0",
+  "description": "Reference extension for reorganizing selected Chrome bookmark folders through the Chrome bookmarks API.",
+  "permissions": [
+    "bookmarks",
+    "tabs",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Bookmark Organizer"
+  }
+}

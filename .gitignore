@@ -1,0 +1,9 @@
+.DS_Store
+assignments.js
+*.private.js
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+reports/
